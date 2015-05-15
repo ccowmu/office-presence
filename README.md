@@ -1,29 +1,31 @@
 # Office Presence
 
-## Currently running front-end example
+## Running front-end example
 
-stringy's fish bot is currently providing the front end to this API.
-
-Example usage in IRC #geekboy:
+Usage in IRC (Through stringy's fish bot.): 
 
 `$office` will list the users presently in the office<br/>
 `$office -r <MAC_ADDRESS>` will regiser a MAC address with the nick of the speaker<br/>
 `$office -d <MAC_ADDRES>` to de-register a MAC-to-nick entry<br/>
 
-**Note:** The registration will use your current nick and you can *only* make changes to that registration entry with that nick.
+**Pro-tip:** *fish* can be used via pm and doing so may reduce the amount of pinging and filling of highmons of people currently in club.
+
+**Notes:** The registration will use your current nick and you can *only* make changes to that registration entry with that nick.
+
+
 
 
 ## API
 
-The server is hosted at: magpie.dhcp.io
+The server is hosted at: `magpie.dhcp.io`
 
-The following paths provide the various API functionality:
+The following paths on the server provide the following API functionality:
 
 /json<br/>
 **Returns:** `{"registered": [<list of registered users>], "others": #of-non-registered-users}`
 
 /plain<br/>
-**Returns:** nick1 nick2 nick3 Non-registered: #<br/>
+**Returns:** `nick1 nick2 nick3 Non-registered: #`<br/>
 **Notes:** The return is a space seperated list of nicks as well as the number of non-registered users presently on the network.
 
 /reg<br/>
@@ -44,7 +46,7 @@ The following paths provide the various API functionality:
 
 ## Todo
 
-- Potentially allow remove all macs associated with a nick just by passing the nick
+- Potentially be able to remove all macs associated with a nick just by passing the nick
 
 
 ## Contributers
@@ -53,5 +55,5 @@ The following paths provide the various API functionality:
 - stringy
 - sphinx
 
-(Idea pulled from suggestion by bears on the wikipages.)
+(Idea pulled from suggestion by bears on the club wiki pages.)
 
