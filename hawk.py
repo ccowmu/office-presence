@@ -1,3 +1,5 @@
+#!/usr/bin/env python2
+
 # Contributers:
 #     Sphinx
 #     themind (JPyPi on Github)
@@ -73,7 +75,7 @@ def plain_resp():
     non_registered = len(l[1])
     extra = ""
     if non_registered > 0:
-        extra = " Non-registered: %d"%non_registered
+        extra = " - Unregistered: %d"%non_registered
     return " ".join(l[0])+extra
 
 
@@ -83,4 +85,4 @@ def get_leases():
 
 
 if __name__ == '__main__':
-    app.run()
+    app.run(host='0.0.0.0', port=5001)
