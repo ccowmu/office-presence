@@ -1,8 +1,8 @@
 #!/usr/bin/env python2
 
 # Contributers:
-#     Sphinx
-#     themind (JPyPi on Github)
+#     sphinx
+#     themind (jpypi on Github)
 
 import flask
 import inroom
@@ -19,7 +19,7 @@ FAILURE = (FAIL, 400, [])
 valid_mac_patt = re_compile("[:\-]".join(("[0-9a-fA-F]{2}",)*6))
 def ValidateMac(mac_string):
     if valid_mac_patt.match(mac_string):
-        return mac_string.replace("-",":").lower()
+        return mac_string.replace("-", ":").lower()
 
     return False
         
@@ -43,7 +43,7 @@ def dereg():
     nick = flask.request.form.get('nick', '')
 
     # inroom.DeregisterMac returns True if it succeeded
-    if mac_addr and nick and inroom.DeregisterMac(mac_addr,nick):
+    if mac_addr and nick and inroom.DeregisterMac(mac_addr, nick):
         return 'success'
     if nick:
         return FAIL #'success'
@@ -53,7 +53,7 @@ def dereg():
 
 @app.route('/list', methods=['POST'])
 def list_nick_macs():
-    nick = flask.request.form.get('nick','')
+    nick = flask.request.form.get('nick', '')
     if nick:
         mac_addresses = inroom.LookupNick(nick)
         if mac_addresses:

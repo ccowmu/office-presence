@@ -18,29 +18,27 @@ import time
 USERS_FILE = "registrations.config"
 
 
-mac_patt=re.compile("hardware ethernet ([0-9A-Fa-f:]+?);")
-lease_patt=re.compile("lease ([0-9\.]+?) {(.+?)}",re.DOTALL)
-start_time_patt=re.compile("starts [0-9] ([0-9:/ ]+?);")
-end_time_patt=re.compile("ends [0-9] ([0-9:/ ]+?);")
+mac_patt   = re.compile("hardware ethernet ([0-9A-Fa-f:]+?);")
+lease_patt = re.compile("lease ([0-9\.]+?) {(.+?)}", re.DOTALL)
+start_time_patt = re.compile("starts [0-9] ([0-9:/ ]+?);")
+end_time_patt   = re.compile("ends [0-9] ([0-9:/ ]+?);")
 
 def LoadRegistrations():
     try:
-        f=open(USERS_FILE,"r")
-        users=json.load(f)
-        f.close()
-        return users
+        with open(USERS_FILE, "r") as f:
+            users=json.load(f)
+            return users
     except (IOError, ValueError):
         return {}
 
 
 def GetIgnoreMacs():
     try:
-        f=open("ignorelist.config","r")
-        # Only return non-comment lines. Beginning of line must
-        # be a # (octothorpe) symbol
-        return filter(lambda line: not line.lstrip().startswith("#"), \
-                      f.read().strip().split("\n"))
-        f.close()
+        with open("ignorelist.config","r") as f:
+            # Only return non-comment lines. Beginning of line must
+            # be a # (octothorpe) symbol
+            return filter(lambda line: not line.lstrip().startswith("#"), \
+                          f.read().strip().split("\n"))
     except IOError:
         sys.stderr.write("No ignorelist.config file\n")
         pass
@@ -51,14 +49,13 @@ def GetIgnoreMacs():
 def RegisterMac(mac,name):
     users = LoadRegistrations()
 
-    if not users.get(mac.lower(),None):
+    if not users.get(mac.lower(), None):
         users[mac.lower()] = name
     else:
         return False
 
-    f=open(USERS_FILE,"w")
-    json.dump(users,f)
-    f.close()
+    with open(USERS_FILE, "w") as f:
+        json.dump(users, f)
 
     return True
 
@@ -68,9 +65,8 @@ def DeregisterMac(mac,nick):
         users = LoadRegistrations()
         if users[mac]==nick:
             del users[mac]
-            f=open(USERS_FILE,"w")
-            json.dump(users,f)
-            f.close()
+            with open(USERS_FILE, "w") as f:
+                json.dump(users,f)
 
             return True
 
@@ -109,13 +105,13 @@ def GetActive(fp):
     other_macs  = []
 
     utc_hours_offset = ((time.daylight and time.altzone) or time.timezone)/60/60
-    utc_offset = datetime.timedelta(0,0,0,0,0,utc_hours_offset,0)
+    utc_offset = datetime.timedelta(0, 0, 0, 0, 0, utc_hours_offset, 0)
 
     # Loop through leases in the leases file found by the regex
     for lease in lease_patt.findall(data):
         # Find the end time for the lease and convert it to a useable datetime
         end_time_s = end_time_patt.search(lease[1]).group(1)
-        end_time = datetime.datetime.strptime(end_time_s,"%Y/%m/%d %H:%M:%S")
+        end_time = datetime.datetime.strptime(end_time_s, "%Y/%m/%d %H:%M:%S")
         # Check that we haven't reached the end of this lease
         # make sure to account for UTC offset
         if now < (end_time-utc_offset):
@@ -140,5 +136,5 @@ def GetActive(fp):
 
 
 if __name__ == "__main__":
-    f=open("/var/lib/dhcp/dhcpd.leases")
-    print GetActive(f)
+    with open("/var/lib/dhcp/dhcpd.leases") as f:
+        print GetActive(f)
