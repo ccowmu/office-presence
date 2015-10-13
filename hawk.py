@@ -16,10 +16,10 @@ FAIL = 'failure'
 FAILURE = (FAIL, 400, [])
 
 
-valid_mac_patt = re_compile(":".join(("[0-9a-fA-F]{2}",)*6))
+valid_mac_patt = re_compile("[:\-]".join(("[0-9a-fA-F]{2}",)*6))
 def ValidateMac(mac_string):
     if valid_mac_patt.match(mac_string):
-        return mac_string.lower()
+        return mac_string.replace("-",":").lower()
 
     return False
         
