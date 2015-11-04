@@ -51,7 +51,7 @@ def dereg():
     return FAIL
 
 
-@app.route('/list', methods=['POST'])
+@app.route('/list', methods=['POST', 'GET'])
 def list_nick_macs():
     nick = flask.request.form.get('nick', '')
     if nick:
