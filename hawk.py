@@ -51,9 +51,18 @@ def dereg():
     return FAIL
 
 
-@app.route('/list', methods=['POST', 'GET'])
-def list_nick_macs():
-    nick = flask.request.form.get('nick', '')
+#@app.route('/list', methods=['POST'])
+#def list_nick_macs():
+#    nick = flask.request.form.get('nick', '')
+#    if nick:
+#        mac_addresses = inroom.LookupNick(nick)
+#        if mac_addresses:
+#            return flask.json.dumps(mac_addresses)
+#
+#    return FAILURE
+
+@app.route('/list/<nick>', methods=['GET'])
+def list_nick_macs(nick):
     if nick:
         mac_addresses = inroom.LookupNick(nick)
         if mac_addresses:
