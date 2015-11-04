@@ -99,7 +99,7 @@ def LookupNick(nick):
 def GetActive(fp):
     data = fp.read()
 
-    now = datetime.datetime.now()
+    now = datetime.datetime.utcnow()
     ignore_macs = GetIgnoreMacs()
     active_users = []
     other_macs  = []
@@ -114,7 +114,7 @@ def GetActive(fp):
         end_time = datetime.datetime.strptime(end_time_s, "%Y/%m/%d %H:%M:%S")
         # Check that we haven't reached the end of this lease
         # make sure to account for UTC offset
-        if now < (end_time-utc_offset):
+        if now < end_time:
             # Pull the mac address from the lease with a regex
             lease_mac_address = mac_patt.findall(lease[1])
             # Make sure the regex actually found a mac address. Sometimes
