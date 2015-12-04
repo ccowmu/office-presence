@@ -85,7 +85,7 @@ def plain_resp():
     extra = ""
     if non_registered > 0:
         extra = " - Unregistered: %d"%non_registered
-    return " ".join(l[0])+extra
+    return ", ".join(l[0])+extra
 
 
 def get_leases():
