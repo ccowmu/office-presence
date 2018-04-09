@@ -89,7 +89,7 @@ def plain_resp():
 
 
 def get_leases():
-    with open('/var/lib/dhcp/dhcpd.leases') as f:
+    with open('dhcpd.leases') as f:
         return inroom.GetActive(f)
 
 
