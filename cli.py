@@ -18,8 +18,8 @@ while True:
         choice = int(choice)
     except ValueError:
         continue
-    
-    print 
+
+    print
 
     if choice==2:
         name = raw_input("Username: ")
@@ -46,5 +46,5 @@ while True:
         name = raw_input("Username: ")
         pprint(inroom.LookupNick(name))
 
-    # Print out a nice newline 
+    # Print out a nice newline
     print
