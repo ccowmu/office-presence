@@ -21,7 +21,7 @@ USERS_FILE = "registrations.config"
 mac_patt   = re.compile("hardware ethernet ([0-9A-Fa-f:]+?);")
 lease_patt = re.compile("lease ([0-9\.]+?) {(.+?)}", re.DOTALL)
 start_time_patt = re.compile("starts [0-9] ([0-9:/ ]+?);")
-end_time_patt   = re.compile("ends [0-9] ([0-9:/ ]+?);")
+end_time_patt   = re.compile("ends (?:[0-9] ([0-9:/ ]+?);|(never))")
 
 def LoadRegistrations():
     try:
@@ -110,15 +110,18 @@ def GetActive(fp):
     for lease in lease_patt.findall(data):
         # Find the end time for the lease and convert it to a useable datetime
         end_time_s = end_time_patt.search(lease[1]).group(1)
-        end_time = datetime.datetime.strptime(end_time_s, "%Y/%m/%d %H:%M:%S")
+        end_time = None
+        if end_time_s != "never":
+            end_time = datetime.datetime.strptime(end_time_s, "%Y/%m/%d %H:%M:%S")
         # Check that we haven't reached the end of this lease
         # make sure to account for UTC offset
-        if now < end_time:
+        if end_time is None or now < end_time:
             # Pull the mac address from the lease with a regex
             lease_mac_address = mac_patt.findall(lease[1])
             # Make sure the regex actually found a mac address. Sometimes
             # a lease doesn't have one, so just ignore and skip to next one
-            if not lease_mac_address: break
+            if not lease_mac_address:
+                continue
             # regex.findall returns a list we just want the zeroth item
             lease_mac_address = lease_mac_address[0]
             if lease_mac_address not in ignore_macs:
