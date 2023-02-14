@@ -73,7 +73,7 @@ def DeregisterMac(mac,nick):
     except (IOError, ValueError, KeyError):
         # Just let the error drop through and return False
         pass
-    
+
     return False
 
 
@@ -93,7 +93,6 @@ def LookupNick(nick):
             macs.append(mac)
 
     return macs
-    
 
 
 def GetActive(fp):
@@ -129,7 +128,7 @@ def GetActive(fp):
                 if user and user not in active_users:
                     active_users.append(user)
                 # Keep track of non-registered mac addresses
-                elif not user and lease_mac_address not in other_macs: 
+                elif not user and lease_mac_address not in other_macs:
                     other_macs.append(lease_mac_address)
 
     return (active_users,other_macs)

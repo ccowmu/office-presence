@@ -5,7 +5,7 @@
 #     themind (jpypi on Github)
 
 import flask
-import inroom
+import dhcpreg
 from re import compile as re_compile
 
 
@@ -22,7 +22,7 @@ def ValidateMac(mac_string):
         return mac_string.replace("-", ":").lower()
 
     return False
-        
+
 
 @app.route('/reg', methods=['POST'])
 def reg():
@@ -31,7 +31,7 @@ def reg():
     if mac_addr and nick:
         # The following may fail if someone tries to register over
         # someone else's MAC/nick
-        if inroom.RegisterMac(mac_addr, nick):
+        if dhcpreg.RegisterMac(mac_addr, nick):
             return 'success'
 
     return FAILURE
@@ -42,8 +42,8 @@ def dereg():
     mac_addr = ValidateMac(flask.request.form.get('mac', ''))
     nick = flask.request.form.get('nick', '')
 
-    # inroom.DeregisterMac returns True if it succeeded
-    if mac_addr and nick and inroom.DeregisterMac(mac_addr, nick):
+    # dhcpreg.DeregisterMac returns True if it succeeded
+    if mac_addr and nick and dhcpreg.DeregisterMac(mac_addr, nick):
         return 'success'
     if nick:
         return FAIL #'success'
@@ -55,7 +55,7 @@ def dereg():
 #def list_nick_macs():
 #    nick = flask.request.form.get('nick', '')
 #    if nick:
-#        mac_addresses = inroom.LookupNick(nick)
+#        mac_addresses = dhcpreg.LookupNick(nick)
 #        if mac_addresses:
 #            return flask.json.dumps(mac_addresses)
 #
@@ -64,7 +64,7 @@ def dereg():
 @app.route('/list/<nick>', methods=['GET'])
 def list_nick_macs(nick):
     if nick:
-        mac_addresses = inroom.LookupNick(nick)
+        mac_addresses = dhcpreg.LookupNick(nick)
         if mac_addresses:
             return flask.json.dumps(mac_addresses)
 
@@ -90,7 +90,7 @@ def plain_resp():
 
 def get_leases():
     with open('dhcpd.leases') as f:
-        return inroom.GetActive(f)
+        return dhcpreg.GetActive(f)
 
 
 if __name__ == '__main__':
