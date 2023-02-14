@@ -111,7 +111,7 @@ def GetActive(fp):
         # Find the end time for the lease and convert it to a useable datetime
         end_time_s = end_time_patt.search(lease[1]).group(1)
         end_time = None
-        if end_time_s != "never":
+        if end_time_s and end_time_s != "never":
             end_time = datetime.datetime.strptime(end_time_s, "%Y/%m/%d %H:%M:%S")
         # Check that we haven't reached the end of this lease
         # make sure to account for UTC offset
