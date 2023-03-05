@@ -138,5 +138,5 @@ def GetActive(fp):
 
 
 if __name__ == "__main__":
-    with open("/var/lib/dhcp/dhcpd.leases") as f:
+    with open("/var/dhcpd/var/db/dhcpd.leases") as f:
         print GetActive(f)

@@ -90,7 +90,7 @@ def plain_resp():
 
 def get_leases():
     # Common usage is via:
-    # ln -s /var/lib/dhcp/dhcpd.leases dhcpd.leases
+    # ln -s /var/dhcpd/var/db/dhcpd.leases dhcpd.leases
     with open('dhcpd.leases') as f:
         return dhcpreg.GetActive(f)
 

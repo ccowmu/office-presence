@@ -7,7 +7,7 @@ To run the office presence service one can simple run `api.py` directly, or use
 A symlink is expecte in the working directory of the api named `dhcpd.leases`.
 This link should point to a dhcpd leases file. Example:
 ```
-$ ln -s /var/lib/dhcp/dhcpd.leases dhcpd.leases
+$ ln -s /var/dhcpd/var/db/dhcpd.leases dhcpd.leases
 ```
 
 While running this service it may be necessary to blacklist certain MAC
