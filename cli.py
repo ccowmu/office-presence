@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-import inroom
+import dhcpreg
 import json
 from pprint import pprint
 
@@ -24,7 +24,7 @@ while True:
     if choice==2:
         name = raw_input("Username: ")
         mac  = raw_input("Mac Address: ")
-        print inroom.RegisterMac(mac,name)
+        print dhcpreg.RegisterMac(mac,name)
 
     if choice==1:
         f=open("registrations.config")
@@ -33,18 +33,18 @@ while True:
 
     if choice==3:
         mac  = raw_input("Mac Address: ")
-        name = inroom.LookupMac(mac)
+        name = dhcpreg.LookupMac(mac)
 
         if name:
             print("Removing user: {}".format(name))
-            inroom.DeregisterMac(mac,name)
+            dhcpreg.DeregisterMac(mac,name)
 
         else:
             print("Error: User not found.")
 
     if choice == 4:
         name = raw_input("Username: ")
-        pprint(inroom.LookupNick(name))
+        pprint(dhcpreg.LookupNick(name))
 
     # Print out a nice newline
     print
