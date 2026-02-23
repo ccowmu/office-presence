@@ -7,11 +7,18 @@
 # CSV columns: address,hwaddr,client_id,valid_lifetime,expire,subnet_id,
 #              fqdn_fwd,fqdn_rev,hostname,state,user_context,pool_id
 #
+# The push script on condor prepends a header line before the CSV:
+#   # RESERVED_MACS: aa:bb:cc:dd:ee:ff,11:22:33:44:55:66,...
+# Any MAC listed there is automatically excluded from $office output,
+# so devices with static DHCP reservations are always ignored without
+# needing a manual ignorelist.config entry.
+#
 # Contributors:
 #     James Jenkins (aka: themind)
 ####################
 
 import csv
+import io
 import time
 import json
 import sys
@@ -84,12 +91,26 @@ def GetActiveMacs(fp):
     (STATE_DEFAULT) and the expiry timestamp is in the future.
 
     Lease start is approximated as expire - valid_lifetime.
+
+    If the file begins with '# RESERVED_MACS: <comma-list>', those MACs are
+    added to the ignore set automatically (devices with static reservations).
     """
     now = time.time()
-    ignore_macs = GetIgnoreMacs()
-    result = {}
+    ignore_macs = set(m.lower() for m in GetIgnoreMacs())
 
-    reader = csv.DictReader(fp)
+    content = fp.read()
+    first, _, rest = content.partition("\n")
+    if first.startswith("# RESERVED_MACS:"):
+        for mac in first[len("# RESERVED_MACS:"):].split(","):
+            mac = mac.strip().lower()
+            if mac:
+                ignore_macs.add(mac)
+        csv_content = rest
+    else:
+        csv_content = content
+
+    result = {}
+    reader = csv.DictReader(io.StringIO(csv_content))
     for row in reader:
         try:
             if int(row["state"]) != 0:
