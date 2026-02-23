@@ -1,142 +1,110 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 
 ####################
-# DHCP Lease parser to find leases that haven't expired
+# ARP table parser to find active devices on the local network
 # and pair them up with registered MAC addresses
 #
-# Contributers:
-#     James Jenkins (aka: themind)
+# Originally: DHCP lease parser by James Jenkins (aka: themind)
+# Ported to Python 3, switched to `ip neigh` ARP format
 ####################
 
-import re
-import datetime
 import json
 import sys
-import time
 
 
-USERS_FILE = "registrations.config"
+USERS_FILE = "data/registrations.config"
 
-
-mac_patt   = re.compile("hardware ethernet ([0-9A-Fa-f:]+?);")
-lease_patt = re.compile("lease ([0-9\.]+?) {(.+?)}", re.DOTALL)
-start_time_patt = re.compile("starts [0-9] ([0-9:/ ]+?);")
-end_time_patt   = re.compile("ends (?:[0-9] ([0-9:/ ]+?);|(never))")
 
 def LoadRegistrations():
     try:
         with open(USERS_FILE, "r") as f:
-            users=json.load(f)
-            return users
+            return json.load(f)
     except (IOError, ValueError):
         return {}
 
 
-def GetIgnoreMacs():
-    try:
-        with open("ignorelist.config","r") as f:
-            # Only return non-comment lines. Beginning of line must
-            # be a # (octothorpe) symbol
-            return filter(lambda line: not line.lstrip().startswith("#"), \
-                          f.read().strip().split("\n"))
-    except IOError:
-        sys.stderr.write("No ignorelist.config file\n")
-        pass
-
-    return []
-
-
-def RegisterMac(mac,name):
-    users = LoadRegistrations()
-
-    if not users.get(mac.lower(), None):
-        users[mac.lower()] = name
-    else:
-        return False
-
+def _save(users):
+    import os
+    os.makedirs(os.path.dirname(USERS_FILE), exist_ok=True)
     with open(USERS_FILE, "w") as f:
         json.dump(users, f)
 
-    return True
+
+def GetIgnoreMacs():
+    try:
+        with open("ignorelist.config", "r") as f:
+            return [line.strip() for line in f
+                    if line.strip() and not line.lstrip().startswith("#")]
+    except IOError:
+        sys.stderr.write("No ignorelist.config file\n")
+    return []
 
 
-def DeregisterMac(mac,nick):
+def RegisterMac(mac, name):
+    users = LoadRegistrations()
+    if not users.get(mac.lower()):
+        users[mac.lower()] = name
+        _save(users)
+        return True
+    return False
+
+
+def DeregisterMac(mac, nick):
     try:
         users = LoadRegistrations()
-        if users[mac]==nick:
+        if users[mac] == nick:
             del users[mac]
-            with open(USERS_FILE, "w") as f:
-                json.dump(users,f)
-
+            _save(users)
             return True
-
     except (IOError, ValueError, KeyError):
-        # Just let the error drop through and return False
         pass
-
     return False
 
 
 def LookupMac(mac):
     try:
-        users = LoadRegistrations()
-        return users[mac.lower()]
+        return LoadRegistrations()[mac.lower()]
     except KeyError:
         return None
 
 
 def LookupNick(nick):
-    users = LoadRegistrations()
-    macs = []
-    for mac, reg_nick in users.iteritems():
-        if reg_nick == nick:
-            macs.append(mac)
-
-    return macs
+    return [mac for mac, n in LoadRegistrations().items() if n == nick]
 
 
 def GetActive(fp):
-    data = fp.read()
+    """Parse `ip neigh show` output to find active devices.
 
-    now = datetime.datetime.utcnow()
+    Line format:
+        192.168.1.1 dev eth0 lladdr e6:21:32:29:ca:2a REACHABLE
+        192.168.1.98 dev eth0 lladdr 96:31:2c:ca:51:72 STALE
+        192.168.1.237 dev eth0 FAILED
+    """
     ignore_macs = GetIgnoreMacs()
     active_users = []
-    other_macs  = []
+    other_macs = []
 
-    utc_hours_offset = ((time.daylight and time.altzone) or time.timezone)/60/60
-    utc_offset = datetime.timedelta(0, 0, 0, 0, 0, utc_hours_offset, 0)
+    for line in fp.read().strip().splitlines():
+        parts = line.split()
+        if 'lladdr' not in parts:
+            continue
+        if parts[-1] == 'FAILED':
+            continue
+        try:
+            mac = parts[parts.index('lladdr') + 1].lower()
+        except (ValueError, IndexError):
+            continue
+        if mac in ignore_macs:
+            continue
+        user = LookupMac(mac)
+        if user and user not in active_users:
+            active_users.append(user)
+        elif not user and mac not in other_macs:
+            other_macs.append(mac)
 
-    # Loop through leases in the leases file found by the regex
-    for lease in lease_patt.findall(data):
-        # Find the end time for the lease and convert it to a useable datetime
-        end_time_s = end_time_patt.search(lease[1]).group(1)
-        end_time = None
-        if end_time_s and end_time_s != "never":
-            end_time = datetime.datetime.strptime(end_time_s, "%Y/%m/%d %H:%M:%S")
-        # Check that we haven't reached the end of this lease
-        # make sure to account for UTC offset
-        if end_time is None or now < end_time:
-            # Pull the mac address from the lease with a regex
-            lease_mac_address = mac_patt.findall(lease[1])
-            # Make sure the regex actually found a mac address. Sometimes
-            # a lease doesn't have one, so just ignore and skip to next one
-            if not lease_mac_address:
-                continue
-            # regex.findall returns a list we just want the zeroth item
-            lease_mac_address = lease_mac_address[0]
-            if lease_mac_address not in ignore_macs:
-                user = LookupMac(lease_mac_address)
-                # If a registered user was found and not alreay active from
-                # some other lease (possibly a secondary device).
-                if user and user not in active_users:
-                    active_users.append(user)
-                # Keep track of non-registered mac addresses
-                elif not user and lease_mac_address not in other_macs:
-                    other_macs.append(lease_mac_address)
-
-    return (active_users,other_macs)
+    return (active_users, other_macs)
 
 
 if __name__ == "__main__":
-    with open("/var/dhcpd/var/db/dhcpd.leases") as f:
-        print GetActive(f)
+    with open("arp.txt") as f:
+        print(GetActive(f))

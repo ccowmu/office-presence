@@ -1,1 +1,4 @@
 *.pyc
+data/
+arp.txt
+ignorelist.config

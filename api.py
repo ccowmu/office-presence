@@ -1,6 +1,6 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 
-# Contributers:
+# Contributors:
 #     sphinx
 #     themind (jpypi on Github)
 
@@ -20,7 +20,6 @@ valid_mac_patt = re_compile("[:\-]".join(("[0-9a-fA-F]{2}",)*6))
 def ValidateMac(mac_string):
     if valid_mac_patt.match(mac_string):
         return mac_string.replace("-", ":").lower()
-
     return False
 
 
@@ -29,11 +28,8 @@ def reg():
     mac_addr = ValidateMac(flask.request.form.get('mac', ''))
     nick = flask.request.form.get('nick', '')
     if mac_addr and nick:
-        # The following may fail if someone tries to register over
-        # someone else's MAC/nick
         if dhcpreg.RegisterMac(mac_addr, nick):
             return 'success'
-
     return FAILURE
 
 
@@ -41,58 +37,46 @@ def reg():
 def dereg():
     mac_addr = ValidateMac(flask.request.form.get('mac', ''))
     nick = flask.request.form.get('nick', '')
-
-    # dhcpreg.DeregisterMac returns True if it succeeded
     if mac_addr and nick and dhcpreg.DeregisterMac(mac_addr, nick):
         return 'success'
     if nick:
-        return FAIL #'success'
-
+        return FAIL
     return FAIL
 
 
 @app.route('/list', methods=['POST'])
 def list_nick_macs():
-   nick = flask.request.form.get('nick', '')
-   if nick:
-       mac_addresses = dhcpreg.LookupNick(nick)
-       if mac_addresses:
-           return flask.json.dumps(mac_addresses)
-
-   return FAILURE
-
-# @app.route('/list/<nick>', methods=['GET'])
-# def list_nick_macs(nick):
-#     if nick:
-#         mac_addresses = dhcpreg.LookupNick(nick)
-#         if mac_addresses:
-#             return flask.json.dumps(mac_addresses)
-
-#     return FAILURE
+    nick = flask.request.form.get('nick', '')
+    if nick:
+        mac_addresses = dhcpreg.LookupNick(nick)
+        if mac_addresses:
+            return flask.json.dumps(mac_addresses)
+    return FAILURE
 
 
 @app.route('/json')
 def json_resp():
-    leases = get_leases()
+    leases = get_active()
     response = {"registered": leases[0], "others": len(leases[1])}
     return flask.json.dumps(response)
 
 
 @app.route('/plain')
 def plain_resp():
-    l = get_leases()
+    l = get_active()
     non_registered = len(l[1])
     extra = ""
     if non_registered > 0:
-        extra = " - Unregistered: %d"%non_registered
-    return ", ".join(l[0])+extra
+        extra = " - Unregistered: %d" % non_registered
+    return ", ".join(l[0]) + extra
 
 
-def get_leases():
-    # Common usage is via:
-    # ln -s /var/dhcpd/var/db/dhcpd.leases dhcpd.leases
-    with open('dhcpd.leases') as f:
-        return dhcpreg.GetActive(f)
+def get_active():
+    try:
+        with open('arp.txt') as f:
+            return dhcpreg.GetActive(f)
+    except FileNotFoundError:
+        return ([], [])
 
 
 if __name__ == '__main__':
