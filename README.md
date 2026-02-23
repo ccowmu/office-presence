@@ -29,9 +29,9 @@ The container polls the leases file every 5 seconds and maintains session
 state in `data/sessions.json`. Arrivals are recorded when a MAC first appears;
 departures are detected when the lease is released or expires.
 
-Using `binding state active` (rather than just lease expiry) means DHCP
-RELEASE packets cause immediate departure detection without waiting for the
-lease to expire.
+Uses Kea DHCP4 memfile CSV format (pfSense 2.8+). A lease is active when
+`state == 0` (STATE_DEFAULT) and its expiry timestamp is in the future.
+Departure is detected when a lease transitions out of state 0 or expires.
 
 ## Privacy
 
@@ -92,8 +92,12 @@ Install the push script at `/usr/local/bin/push-dhcp.sh`:
 
 ```sh
 #!/bin/sh
-cat /var/dhcpd/var/db/dhcpd.leases | ssh -F /root/.ssh/config_office_presence yakko-office
+cat /var/lib/kea/dhcp4.leases | ssh -F /root/.ssh/config_office_presence yakko-office
 ```
+
+> **Note:** pfSense 2.8+ uses Kea DHCP instead of ISC dhcpd. The lease file
+> moved from `/var/dhcpd/var/db/dhcpd.leases` to `/var/lib/kea/dhcp4.leases`
+> and uses CSV format instead of the old ISC config syntax.
 
 Make it executable:
 

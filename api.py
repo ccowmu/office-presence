@@ -64,7 +64,7 @@ def _fmt_duration(seconds):
 
 
 def _poll_leases():
-    """Background thread: poll dhcpd.leases every POLL_INTERVAL seconds.
+    """Background thread: poll dhcp4.leases every POLL_INTERVAL seconds.
 
     Maintains _sessions: records arrival time when a MAC first appears,
     removes it when it disappears from active leases.
@@ -75,7 +75,7 @@ def _poll_leases():
 
     while True:
         try:
-            with open("dhcpd.leases") as f:
+            with open("dhcp4.leases") as f:
                 active_macs = dhcpreg.GetActiveMacs(f)
         except FileNotFoundError:
             active_macs = {}

@@ -1,4 +1,4 @@
 *.pyc
 data/
-arp.txt
+dhcp4.leases
 ignorelist.config

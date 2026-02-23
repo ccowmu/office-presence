@@ -3,23 +3,21 @@
 ####################
 # DHCP lease parser to find active leases and pair them with registered nicks.
 #
+# Parses Kea DHCP4 memfile CSV format (pfSense 2.8+).
+# CSV columns: address,hwaddr,client_id,valid_lifetime,expire,subnet_id,
+#              fqdn_fwd,fqdn_rev,hostname,state,user_context,pool_id
+#
 # Contributors:
 #     James Jenkins (aka: themind)
 ####################
 
-import re
-import datetime
+import csv
+import time
 import json
 import sys
 
 
 USERS_FILE = "data/registrations.config"
-
-mac_patt      = re.compile(r"hardware ethernet ([0-9A-Fa-f:]+?);")
-lease_patt    = re.compile(r"lease ([0-9\.]+?) \{(.+?)\}", re.DOTALL)
-end_time_patt = re.compile(r"ends (?:[0-9] ([0-9:/ ]+?);|(never))")
-state_patt    = re.compile(r"binding state (\w+);")
-start_patt    = re.compile(r"starts [0-9] ([0-9:/ ]+?);")
 
 
 def LoadRegistrations():
@@ -82,53 +80,32 @@ def LookupNick(nick):
 def GetActiveMacs(fp):
     """Return a dict of {mac: lease_start_timestamp} for all active leases.
 
-    A lease is active if:
-      - binding state is 'active', AND
-      - end time is in the future (or 'never')
+    Parses Kea DHCP4 memfile CSV. A lease is active if state == 0
+    (STATE_DEFAULT) and the expiry timestamp is in the future.
+
+    Lease start is approximated as expire - valid_lifetime.
     """
-    data = fp.read()
-    now = datetime.datetime.utcnow()
+    now = time.time()
     ignore_macs = GetIgnoreMacs()
     result = {}
 
-    for lease in lease_patt.findall(data):
-        body = lease[1]
-
-        state_m = state_patt.search(body)
-        if not state_m or state_m.group(1) != "active":
-            continue
-
-        end_m = end_time_patt.search(body)
-        if not end_m:
-            continue
-        end_s = end_m.group(1)
-        if end_s and end_s != "never":
-            end_time = datetime.datetime.strptime(end_s, "%Y/%m/%d %H:%M:%S")
-            if now >= end_time:
+    reader = csv.DictReader(fp)
+    for row in reader:
+        try:
+            if int(row["state"]) != 0:
                 continue
-
-        macs = mac_patt.findall(body)
-        if not macs:
+            expire = int(row["expire"])
+            if expire <= now:
+                continue
+            mac = row["hwaddr"].lower()
+            if mac in ignore_macs:
+                continue
+            valid_lifetime = int(row["valid_lifetime"])
+            lease_start = expire - valid_lifetime
+            if mac not in result or lease_start < result[mac]:
+                result[mac] = lease_start
+        except (KeyError, ValueError):
             continue
-        mac = macs[0].lower()
-
-        if mac in ignore_macs:
-            continue
-
-        start_m = start_patt.search(body)
-        if start_m:
-            try:
-                lease_start = datetime.datetime.strptime(
-                    start_m.group(1), "%Y/%m/%d %H:%M:%S"
-                ).timestamp()
-            except ValueError:
-                lease_start = None
-        else:
-            lease_start = None
-
-        # Keep earliest start if the same MAC appears multiple times
-        if mac not in result or (lease_start and lease_start < result[mac]):
-            result[mac] = lease_start
 
     return result
 
@@ -150,5 +127,5 @@ def GetActive(fp):
 
 
 if __name__ == "__main__":
-    with open("dhcpd.leases") as f:
+    with open("dhcp4.leases") as f:
         print(GetActive(f))
