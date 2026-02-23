@@ -151,7 +151,7 @@ def list_nick_macs():
 
 @app.route('/json')
 def json_resp():
-    registered, others = _get_presence()
+    registered, _ = _get_presence()
     now = time.time()
     result = []
     for nick, arrival in registered:
@@ -160,12 +160,12 @@ def json_resp():
             entry["arrived"] = int(arrival)
             entry["duration"] = _fmt_duration(now - arrival)
         result.append(entry)
-    return flask.json.dumps({"registered": result, "others": others})
+    return flask.json.dumps({"registered": result})
 
 
 @app.route('/plain')
 def plain_resp():
-    registered, others = _get_presence()
+    registered, _ = _get_presence()
     now = time.time()
     parts = []
     for nick, arrival in registered:
@@ -173,10 +173,7 @@ def plain_resp():
             parts.append("%s (%s)" % (nick, _fmt_duration(now - arrival)))
         else:
             parts.append(nick)
-    extra = ""
-    if others > 0:
-        extra = " - Unregistered: %d" % others
-    return ", ".join(parts) + extra
+    return ", ".join(parts)
 
 
 if __name__ == '__main__':
