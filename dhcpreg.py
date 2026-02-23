@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 
 ####################
-# DHCP lease parser to find leases that haven't expired
-# and pair them up with registered MAC addresses
+# DHCP lease parser to find active leases and pair them with registered nicks.
 #
 # Contributors:
 #     James Jenkins (aka: themind)
@@ -12,14 +11,15 @@ import re
 import datetime
 import json
 import sys
-import time
 
 
 USERS_FILE = "data/registrations.config"
 
-mac_patt        = re.compile("hardware ethernet ([0-9A-Fa-f:]+?);")
-lease_patt      = re.compile(r"lease ([0-9\.]+?) {(.+?)}", re.DOTALL)
-end_time_patt   = re.compile(r"ends (?:[0-9] ([0-9:/ ]+?);|(never))")
+mac_patt      = re.compile(r"hardware ethernet ([0-9A-Fa-f:]+?);")
+lease_patt    = re.compile(r"lease ([0-9\.]+?) \{(.+?)\}", re.DOTALL)
+end_time_patt = re.compile(r"ends (?:[0-9] ([0-9:/ ]+?);|(never))")
+state_patt    = re.compile(r"binding state (\w+);")
+start_patt    = re.compile(r"starts [0-9] ([0-9:/ ]+?);")
 
 
 def LoadRegistrations():
@@ -79,27 +79,35 @@ def LookupNick(nick):
     return [mac for mac, n in LoadRegistrations().items() if n == nick]
 
 
-def GetActive(fp):
-    """Parse a dhcpd.leases file and return active leases matched to nicks."""
+def GetActiveMacs(fp):
+    """Return a dict of {mac: lease_start_timestamp} for all active leases.
+
+    A lease is active if:
+      - binding state is 'active', AND
+      - end time is in the future (or 'never')
+    """
     data = fp.read()
     now = datetime.datetime.utcnow()
     ignore_macs = GetIgnoreMacs()
-    active_users = []
-    other_macs = []
+    result = {}
 
     for lease in lease_patt.findall(data):
-        match = end_time_patt.search(lease[1])
-        if not match:
-            continue
-        end_time_s = match.group(1)
-        end_time = None
-        if end_time_s and end_time_s != "never":
-            end_time = datetime.datetime.strptime(end_time_s, "%Y/%m/%d %H:%M:%S")
+        body = lease[1]
 
-        if end_time is not None and now >= end_time:
+        state_m = state_patt.search(body)
+        if not state_m or state_m.group(1) != "active":
             continue
 
-        macs = mac_patt.findall(lease[1])
+        end_m = end_time_patt.search(body)
+        if not end_m:
+            continue
+        end_s = end_m.group(1)
+        if end_s and end_s != "never":
+            end_time = datetime.datetime.strptime(end_s, "%Y/%m/%d %H:%M:%S")
+            if now >= end_time:
+                continue
+
+        macs = mac_patt.findall(body)
         if not macs:
             continue
         mac = macs[0].lower()
@@ -107,6 +115,31 @@ def GetActive(fp):
         if mac in ignore_macs:
             continue
 
+        start_m = start_patt.search(body)
+        if start_m:
+            try:
+                lease_start = datetime.datetime.strptime(
+                    start_m.group(1), "%Y/%m/%d %H:%M:%S"
+                ).timestamp()
+            except ValueError:
+                lease_start = None
+        else:
+            lease_start = None
+
+        # Keep earliest start if the same MAC appears multiple times
+        if mac not in result or (lease_start and lease_start < result[mac]):
+            result[mac] = lease_start
+
+    return result
+
+
+def GetActive(fp):
+    """Return (registered_nicks, other_macs) for all active leases."""
+    active = GetActiveMacs(fp)
+    active_users = []
+    other_macs = []
+
+    for mac in active:
         user = LookupMac(mac)
         if user and user not in active_users:
             active_users.append(user)
