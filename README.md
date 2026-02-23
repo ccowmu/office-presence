@@ -1,75 +1,117 @@
-# Office Presence
-## Running
+# office-presence
 
-To run the office presence service one can simple run `api.py` directly, or use
-`api.wsgi` behind apache or nginx via the uwsgi moduals.
+Tracks who is physically in the cclub office based on devices currently visible
+on the morgana LAN (192.168.1.0/24). **Opt-in only** — MAC addresses must be
+explicitly registered by the owner before they appear in output.
 
-A symlink is expecte in the working directory of the api named `dhcpd.leases`.
-This link should point to a dhcpd leases file. Example:
+## Architecture
+
 ```
-$ ln -s /var/dhcpd/var/db/dhcpd.leases dhcpd.leases
+albatross (192.168.1.7)          yakko (141.218.143.78)
+  cron: ip neigh show vmbr0  -->  /tmp/morgana-arp.txt
+  (every minute, SSH push)            |
+                                      v
+                               office-presence container
+                               (Docker, ccawmunity compose)
+                                      |
+                                      v
+                               ccawmunity bot
+                               ($office command)
 ```
 
-While running this service it may be necessary to blacklist certain MAC
-addresses such as addresses which are always in the room. (e.g. various desktops
-or other servers on the network) To do this, create a file named
-`ignorelist.config`, and place it in the current working directory. The contents
-must be a single MAC address per line. Lines starting with `#` will be treated
-as a comment line and can be used to describe what device a specific MAC belongs
-to and why it's being filtered out.
+albatross pushes its ARP table to yakko every minute using a
+command-restricted SSH key. The key can only write `/tmp/morgana-arp.txt`
+and nothing else.
 
-## Frontend Chatbot Example UI
+## Privacy
 
-Usage in IRC (Through stringy's fish bot.):
+This service is **opt-in**. Unregistered devices appear only as a count
+("Unregistered: N"). A device only maps to a name after the owner explicitly
+runs `$office -r <mac>`.
 
-`$office` will list the users presently in the office<br/>
-`$office -r <MAC_ADDRESS>` will regiser a MAC address with the nick of the speaker<br/>
-`$office -d <MAC_ADDRES>` to de-register a MAC-to-nick entry<br/>
+## Deployment
 
-**Pro-tip:** *fish* can be used via pm and doing so may reduce the amount of pinging and filling of highmons of people currently in club.
+### yakko
 
-**Notes:** The registration will use your current nick and you can *only* make changes to that registration entry with that nick.
+The service runs as `office-presence` in ccawmunity's `docker-compose.yml`.
+Registrations persist in a named Docker volume (`ccawmunity_office-data`).
 
+```bash
+cd /home/sysadmin/ccawmunity
+docker compose up -d
+```
+
+The `arp.txt` file is bind-mounted from `/tmp/morgana-arp.txt` on the host.
+If the file is missing the service returns empty results gracefully.
+
+### albatross
+
+**One-time setup** — generate a dedicated SSH key and authorize it on yakko:
+
+```bash
+ssh-keygen -t ed25519 -C "albatross-office-presence" \
+    -f /root/.ssh/office_presence_key -N ""
+```
+
+Add the public key to `sysadmin@yakko:~/.ssh/authorized_keys` with a
+command restriction:
+
+```
+command="cat > /tmp/morgana-arp.txt",restrict ssh-ed25519 <pubkey> albatross-office-presence
+```
+
+Create `/root/.ssh/config_office_presence`:
+
+```
+Host yakko-office
+    HostName 141.218.143.78
+    User sysadmin
+    IdentityFile /root/.ssh/office_presence_key
+    IdentitiesOnly yes
+    StrictHostKeyChecking yes
+```
+
+Pre-accept yakko's host key:
+
+```bash
+ssh-keyscan -H 141.218.143.78 >> /root/.ssh/known_hosts
+```
+
+Install the push script at `/usr/local/bin/push-arp.sh`:
+
+```bash
+#!/bin/bash
+ip neigh show dev vmbr0 | ssh -F /root/.ssh/config_office_presence yakko-office
+```
+
+Add to crontab:
+
+```
+* * * * * /usr/local/bin/push-arp.sh
+```
 
 ## API
 
-The server is hosted at: `magpie.dhcp.io`
+| Method | Path    | Params       | Returns |
+|--------|---------|--------------|---------|
+| GET    | /plain  |              | `nick1, nick2 - Unregistered: N` |
+| GET    | /json   |              | `{"registered": [...], "others": N}` |
+| POST   | /reg    | nick, mac    | `success` or `failure` |
+| POST   | /dereg  | nick, mac    | `success` or `failure` |
+| POST   | /list   | nick         | `["mac1", "mac2"]` or `failure` |
 
-The following paths on the server provide the following API functionality:
+## Configuration
 
-/json<br/>
-**Returns:** `{"registered": [<list of registered users>], "others": #of-non-registered-users}`
+**`ignorelist.config`** (optional) — one MAC per line, lines starting with
+`#` are comments. MACs listed here are excluded from all output including
+the unregistered count. Use this for permanent fixtures (servers, APs, etc.).
 
-/plain<br/>
-**Returns:** `nick1 nick2 nick3 Non-registered: #`<br/>
-**Notes:** The return is a space seperated list of nicks as well as the number of non-registered users presently on the network.
+```
+# office AP
+aa:bb:cc:dd:ee:ff
+# desktop in the corner
+11:22:33:44:55:66
+```
 
-/reg<br/>
-**POST args:** `nick & mac`<br/>
-**Returns:** `success` or `failure`<br/>
-**Notes:** Both nick and mac are required. `mac` must be a valid MAC address.<br/>
-
-/dereg<br/>
-**POST args:** `nick & mac`<br/>
-**Returns:** `success` or `failure`<br/>
-**Notes:** This will de-register a MAC address to nick association based on the MAC. *Only one* MAC will be removed. The nick *must* match the one associated with the MAC address.
-
-/list<br/>
-**POST args:** `nick`<br/>
-**Returns:** `["MAC1","MAC2"]`<br/>
-**Notes:** The return is a json list of MAC addresses registered under a particular username.
-
-
-## Todo
-
-- Potentially be able to remove all macs associated with a nick just by passing the nick
-
-
-## Contributers
-
-- themind
-- stringy
-- sphinx
-
-(Idea pulled from suggestion by bears on the club wiki pages.)
-
+**`data/registrations.config`** — auto-managed JSON file mapping MAC
+addresses to nicks. Do not edit by hand while the service is running.
