@@ -1,4 +1,3 @@
 *.pyc
 data/
 dhcp4.leases
-ignorelist.config
