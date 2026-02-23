@@ -1,27 +1,30 @@
 # office-presence
 
-Tracks who is physically in the cclub office based on devices currently visible
+Tracks who is physically in the cclub office based on active DHCP leases
 on the morgana LAN (192.168.1.0/24). **Opt-in only** — MAC addresses must be
 explicitly registered by the owner before they appear in output.
 
 ## Architecture
 
 ```
-albatross (192.168.1.7)          yakko (141.218.143.78)
-  cron: ip neigh show vmbr0  -->  /tmp/morgana-arp.txt
-  (every minute, SSH push)            |
-                                      v
-                               office-presence container
-                               (Docker, ccawmunity compose)
-                                      |
-                                      v
-                               ccawmunity bot
-                               ($office command)
+condor/pfSense (192.168.1.1)       yakko (141.218.143.78)
+  cron: cat /var/dhcpd/.../         /tmp/morgana-dhcp.leases
+        dhcpd.leases            -->       |
+  (every minute, SSH push)               v
+                                  office-presence container
+                                  (Docker, ccawmunity compose)
+                                          |
+                                          v
+                                  ccawmunity bot
+                                  ($office command)
 ```
 
-albatross pushes its ARP table to yakko every minute using a
-command-restricted SSH key. The key can only write `/tmp/morgana-arp.txt`
+condor pushes its DHCP leases file to yakko every minute using a
+command-restricted SSH key. The key can only write `/tmp/morgana-dhcp.leases`
 and nothing else.
+
+Using DHCP leases (rather than ARP) means presence data is authoritative:
+devices appear when they get a lease and disappear when it expires.
 
 ## Privacy
 
@@ -41,15 +44,15 @@ cd /home/sysadmin/ccawmunity
 docker compose up -d
 ```
 
-The `arp.txt` file is bind-mounted from `/tmp/morgana-arp.txt` on the host.
-If the file is missing the service returns empty results gracefully.
+The `dhcpd.leases` file is bind-mounted from `/tmp/morgana-dhcp.leases` on
+the host. If the file is missing the service returns empty results gracefully.
 
-### albatross
+### condor (pfSense)
 
 **One-time setup** — generate a dedicated SSH key and authorize it on yakko:
 
 ```bash
-ssh-keygen -t ed25519 -C "albatross-office-presence" \
+ssh-keygen -t ed25519 -C "condor-office-presence" \
     -f /root/.ssh/office_presence_key -N ""
 ```
 
@@ -57,7 +60,7 @@ Add the public key to `sysadmin@yakko:~/.ssh/authorized_keys` with a
 command restriction:
 
 ```
-command="cat > /tmp/morgana-arp.txt",restrict ssh-ed25519 <pubkey> albatross-office-presence
+command="cat > /tmp/morgana-dhcp.leases",restrict ssh-ed25519 <pubkey> condor-office-presence
 ```
 
 Create `/root/.ssh/config_office_presence`:
@@ -77,17 +80,17 @@ Pre-accept yakko's host key:
 ssh-keyscan -H 141.218.143.78 >> /root/.ssh/known_hosts
 ```
 
-Install the push script at `/usr/local/bin/push-arp.sh`:
+Install the push script at `/usr/local/bin/push-dhcp.sh`:
 
-```bash
-#!/bin/bash
-ip neigh show dev vmbr0 | ssh -F /root/.ssh/config_office_presence yakko-office
+```sh
+#!/bin/sh
+cat /var/dhcpd/var/db/dhcpd.leases | ssh -F /root/.ssh/config_office_presence yakko-office
 ```
 
-Add to crontab:
+Add to `/usr/local/etc/cron.d/office-presence`:
 
 ```
-* * * * * /usr/local/bin/push-arp.sh
+* * * * * root /usr/local/bin/push-dhcp.sh
 ```
 
 ## API

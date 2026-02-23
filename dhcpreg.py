@@ -1,18 +1,25 @@
 #!/usr/bin/env python3
 
 ####################
-# ARP table parser to find active devices on the local network
+# DHCP lease parser to find leases that haven't expired
 # and pair them up with registered MAC addresses
 #
-# Originally: DHCP lease parser by James Jenkins (aka: themind)
-# Ported to Python 3, switched to `ip neigh` ARP format
+# Contributors:
+#     James Jenkins (aka: themind)
 ####################
 
+import re
+import datetime
 import json
 import sys
+import time
 
 
 USERS_FILE = "data/registrations.config"
+
+mac_patt        = re.compile("hardware ethernet ([0-9A-Fa-f:]+?);")
+lease_patt      = re.compile(r"lease ([0-9\.]+?) {(.+?)}", re.DOTALL)
+end_time_patt   = re.compile(r"ends (?:[0-9] ([0-9:/ ]+?);|(never))")
 
 
 def LoadRegistrations():
@@ -73,29 +80,33 @@ def LookupNick(nick):
 
 
 def GetActive(fp):
-    """Parse `ip neigh show` output to find active devices.
-
-    Line format:
-        192.168.1.1 dev eth0 lladdr e6:21:32:29:ca:2a REACHABLE
-        192.168.1.98 dev eth0 lladdr 96:31:2c:ca:51:72 STALE
-        192.168.1.237 dev eth0 FAILED
-    """
+    """Parse a dhcpd.leases file and return active leases matched to nicks."""
+    data = fp.read()
+    now = datetime.datetime.utcnow()
     ignore_macs = GetIgnoreMacs()
     active_users = []
     other_macs = []
 
-    for line in fp.read().strip().splitlines():
-        parts = line.split()
-        if 'lladdr' not in parts:
+    for lease in lease_patt.findall(data):
+        match = end_time_patt.search(lease[1])
+        if not match:
             continue
-        if parts[-1] == 'FAILED':
+        end_time_s = match.group(1)
+        end_time = None
+        if end_time_s and end_time_s != "never":
+            end_time = datetime.datetime.strptime(end_time_s, "%Y/%m/%d %H:%M:%S")
+
+        if end_time is not None and now >= end_time:
             continue
-        try:
-            mac = parts[parts.index('lladdr') + 1].lower()
-        except (ValueError, IndexError):
+
+        macs = mac_patt.findall(lease[1])
+        if not macs:
             continue
+        mac = macs[0].lower()
+
         if mac in ignore_macs:
             continue
+
         user = LookupMac(mac)
         if user and user not in active_users:
             active_users.append(user)
@@ -106,5 +117,5 @@ def GetActive(fp):
 
 
 if __name__ == "__main__":
-    with open("arp.txt") as f:
+    with open("dhcpd.leases") as f:
         print(GetActive(f))

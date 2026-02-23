@@ -73,7 +73,7 @@ def plain_resp():
 
 def get_active():
     try:
-        with open('arp.txt') as f:
+        with open('dhcpd.leases') as f:
             return dhcpreg.GetActive(f)
     except FileNotFoundError:
         return ([], [])
